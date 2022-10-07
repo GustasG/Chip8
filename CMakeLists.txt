@@ -8,4 +8,6 @@ add_subdirectory(libs/SDL)
 
 add_subdirectory(src)
 
-target_link_libraries(Chip8 PRIVATE SDL2::SDL2 SDL2::SDL2main)
+target_link_libraries(Chip8
+    PRIVATE SDL2::SDL2 SDL2::SDL2main
+)
