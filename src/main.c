@@ -1,13 +1,13 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <stdio.h>
 
 #include <SDL.h>
 
-#include "chip8.h"
+#include "chip8_emulator.h"
 
 int main(int argc, char** argv) {
-    Chip8* chip = NULL;
+    Chip8Emulator* emulator = NULL;
 
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         fprintf(stderr, "SDL init failed\n");
@@ -15,20 +15,19 @@ int main(int argc, char** argv) {
     }
 
     srand(time(NULL));
-    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
 
-    if ((chip = chip8_create()) == NULL) {
+    if ((emulator = chip8_emulator_create()) == NULL) {
         fprintf(stderr, "Failed to create chip\n");
         return 1;
     }
 
-    if (chip8_load_rom(chip, "roms/IBM Logo.ch8") == 0) {
-        fprintf(stderr, "Failed to load rom\n");
+    if (chip8_load_rom_file(emulator->chip, "roms/MAZE") == 0) {
+        fprintf(stderr, "%s\n", SDL_GetError());
         return 1;
     }
 
-    chip8_run(chip);
-    chip8_destroy(chip);
+    chip8_emulator_run(emulator);
+    chip8_emulator_destroy(emulator);
 
     SDL_Quit();
 

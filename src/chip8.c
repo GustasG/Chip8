@@ -2,14 +2,8 @@
 
 #include <stdlib.h>
 
-#include <SDL_events.h>
-#include <SDL_log.h>
-#include <SDL_render.h>
-#include <SDL_timer.h>
-
-#define SCREEN_WIDTH 32
-#define SCREEN_HEIGHT 64
-#define FPS 60.0f
+#include <SDL_error.h>
+#include <SDL_rwops.h>
 
 static const uint8_t fontset[] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0,
@@ -30,25 +24,6 @@ static const uint8_t fontset[] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80
 };
 
-static const int key_map[] = {
-    SDL_SCANCODE_1, // 0
-    SDL_SCANCODE_2, // 1
-    SDL_SCANCODE_3, // 2
-    SDL_SCANCODE_4, // 3
-    SDL_SCANCODE_Q, // 4
-    SDL_SCANCODE_W, // 5
-    SDL_SCANCODE_E, // 6
-    SDL_SCANCODE_R, // 7
-    SDL_SCANCODE_A, // 8
-    SDL_SCANCODE_S, // 9
-    SDL_SCANCODE_D, // A
-    SDL_SCANCODE_F, // B
-    SDL_SCANCODE_Z, // C
-    SDL_SCANCODE_X, // D
-    SDL_SCANCODE_C, // E
-    SDL_SCANCODE_V // F
-};
-
 enum Chip8InstructionError {
     CHIP8_ERROR_NONE = 0,
     CHIP8_INVALID_INSTRUCTION
@@ -56,41 +31,19 @@ enum Chip8InstructionError {
 
 struct Chip8 {
     uint8_t ram[4096];
-    uint32_t pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
+    uint32_t pixels[CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT];
     uint16_t stack[32];
     uint8_t V[16];
+    uint8_t* key_state;
     uint16_t I;
     uint16_t PC;
     uint16_t SP;
     uint8_t delay_timer;
     uint8_t sound_timer;
     SDL_bool draw_flag;
-    SDL_bool running;
-
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-    SDL_Texture* texture;
 };
 
-static uint8_t wait_key_press() {
-    SDL_Event event;
-
-    while (1) {
-        SDL_WaitEvent(&event);
-
-        switch (event.type)
-        {
-        case SDL_KEYDOWN:
-            for (size_t i = 0; i < sizeof(key_map) / sizeof(key_map[0]); i++) {
-                if (event.key.keysym.scancode == key_map[i]) {
-                    return (uint8_t)i;
-                }
-            }
-        }
-    }
-}
-
-static uint16_t fetch_opcode(const Chip8* chip) {
+static uint16_t fetch(const Chip8* chip) {
     uint8_t hb = chip->ram[chip->PC];
     uint8_t lb = chip->ram[chip->PC + 1];
 
@@ -98,22 +51,19 @@ static uint16_t fetch_opcode(const Chip8* chip) {
 }
 
 static void push(Chip8* chip, uint16_t value) {
-    SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "PUSH %x", value);
     chip->stack[chip->SP++] = value;
 }
 
 static uint16_t pop(Chip8* chip) {
-    uint16_t value = chip->stack[--chip->SP];
-    SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "POP %x", value);
-    return value;
+    return chip->stack[--chip->SP];
 }
 
-static int exec0(Chip8* chip, uint16_t opcode) {
+static int execute0(Chip8* chip, uint16_t opcode) {
     switch (opcode)
     {
     case 0x00E0:
         SDL_memset(chip->pixels, 0, sizeof(chip->pixels));
-        chip->draw_flag = SDL_TRUE;
+        chip8_set_draw_flag(chip, SDL_TRUE);
         chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x00EE:
@@ -124,20 +74,20 @@ static int exec0(Chip8* chip, uint16_t opcode) {
     }
 }
 
-static int exec1(Chip8* chip, uint16_t opcode) {
+static int execute1(Chip8* chip, uint16_t opcode) {
     chip->PC = opcode & 0x0FFF;
 
     return CHIP8_ERROR_NONE;
 }
 
-static int exec2(Chip8* chip, uint16_t opcode) {
+static int execute2(Chip8* chip, uint16_t opcode) {
     push(chip, chip->PC);
     chip->PC = opcode & 0x0FFF;
 
     return CHIP8_ERROR_NONE;
 }
 
-static int exec3(Chip8* chip, uint16_t opcode) {
+static int execute3(Chip8* chip, uint16_t opcode) {
     uint8_t reg = (opcode & 0x0F00) >> 8;
     uint16_t value = opcode & 0x00FF;
 
@@ -150,7 +100,7 @@ static int exec3(Chip8* chip, uint16_t opcode) {
     return CHIP8_ERROR_NONE;
 }
 
-static int exec4(Chip8* chip, uint16_t opcode) {
+static int execute4(Chip8* chip, uint16_t opcode) {
     uint8_t reg = (opcode & 0x0F00) >> 8;
     uint16_t value = opcode & 0x00FF;
 
@@ -163,7 +113,7 @@ static int exec4(Chip8* chip, uint16_t opcode) {
     return CHIP8_ERROR_NONE;
 }
 
-static int exec5(Chip8* chip, uint16_t opcode) {
+static int execute5(Chip8* chip, uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
 
@@ -176,7 +126,7 @@ static int exec5(Chip8* chip, uint16_t opcode) {
     return CHIP8_ERROR_NONE;
 }
 
-static int exec6(Chip8* chip, uint16_t opcode) {
+static int execute6(Chip8* chip, uint16_t opcode) {
     uint8_t reg = (opcode & 0x0F00) >> 8;
     uint8_t value = opcode & 0x00FF;
 
@@ -186,7 +136,7 @@ static int exec6(Chip8* chip, uint16_t opcode) {
     return CHIP8_ERROR_NONE;
 }
 
-static int exec7(Chip8* chip, uint16_t opcode) {
+static int execute7(Chip8* chip, uint16_t opcode) {
     uint8_t reg = (opcode & 0x0F00) >> 8;
     uint8_t value = opcode & 0x00FF;
 
@@ -196,7 +146,7 @@ static int exec7(Chip8* chip, uint16_t opcode) {
     return CHIP8_ERROR_NONE;
 }
 
-static int exec8(Chip8* chip, uint16_t opcode) {
+static int execute8(Chip8* chip, uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
 
@@ -248,7 +198,7 @@ static int exec8(Chip8* chip, uint16_t opcode) {
     }
 }
 
-static int exec9(Chip8* chip, uint16_t opcode) {
+static int execute9(Chip8* chip, uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
 
@@ -261,21 +211,21 @@ static int exec9(Chip8* chip, uint16_t opcode) {
     return CHIP8_ERROR_NONE;
 }
 
-static int execA(Chip8* chip, uint16_t opcode) {
+static int executeA(Chip8* chip, uint16_t opcode) {
     chip->I = opcode & 0x0FFF;
     chip->PC += 2;
 
     return CHIP8_ERROR_NONE;
 }
 
-static int execB(Chip8* chip, uint16_t opcode) {
+static int executeB(Chip8* chip, uint16_t opcode) {
     chip->PC = chip->V[0] + opcode & 0x0FFF;
     chip->PC += 2;
 
     return CHIP8_ERROR_NONE;
 }
 
-static int execC(Chip8* chip, uint16_t opcode) {
+static int executeC(Chip8* chip, uint16_t opcode) {
     uint8_t reg = (opcode & 0x0F00) >> 8;
     uint8_t random = rand() % 256;
     uint8_t value = opcode & 0x00FF;
@@ -286,7 +236,7 @@ static int execC(Chip8* chip, uint16_t opcode) {
     return CHIP8_ERROR_NONE;
 }
 
-static int execD(Chip8* chip, uint16_t opcode) {
+static int executeD(Chip8* chip, uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
     uint8_t height = opcode & 0x000F;
@@ -297,7 +247,7 @@ static int execD(Chip8* chip, uint16_t opcode) {
         uint8_t pixel = chip->ram[chip->I + i];
 
         for (uint8_t j = 0; j < 8; j++) {
-            uint16_t location = ((chip->V[y] + i) * SCREEN_HEIGHT) + chip->V[x] + j;
+            uint16_t location = ((chip->V[y] + i) * CHIP8_SCREEN_HEIGHT) + chip->V[x] + j;
 
             if ((pixel & (0x80 >> j)) != 0) {
                 if (chip->pixels[location] != 0) {
@@ -310,19 +260,18 @@ static int execD(Chip8* chip, uint16_t opcode) {
     }
 
     chip->PC += 2;
-    chip->draw_flag = SDL_TRUE;
+    chip8_set_draw_flag(chip, SDL_TRUE);
 
     return CHIP8_ERROR_NONE;
 }
 
-static int execE(Chip8* chip, uint16_t opcode) {
-    const Uint8* state = SDL_GetKeyboardState(NULL);
+static int executeE(Chip8* chip, uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
 
     switch (opcode & 0x00FF)
     {
     case 0x009E:
-        if (state[key_map[chip->V[x]]] == 1) {
+        if (chip->key_state[chip->V[x]] == 1) {
             chip->PC += 4;
         } else {
             chip->PC += 2;
@@ -330,7 +279,7 @@ static int execE(Chip8* chip, uint16_t opcode) {
 
         return CHIP8_ERROR_NONE;
     case 0x00A1:
-        if (state[key_map[chip->V[x]]] == 0) {
+        if (chip->key_state[chip->V[x]] == 0) {
             chip->PC += 4;
         } else {
             chip->PC += 2;
@@ -342,7 +291,7 @@ static int execE(Chip8* chip, uint16_t opcode) {
     }
 }
 
-static int execF(Chip8* chip, uint16_t opcode) {
+static int executeF(Chip8* chip, uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
 
     switch (opcode & 0x00FF)
@@ -352,8 +301,14 @@ static int execF(Chip8* chip, uint16_t opcode) {
         chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x000A:
-        chip->V[x] = wait_key_press();
-        chip->PC += 2;
+        for (uint8_t i = 0; i < CHIP8_KEY_COUNT; i++) {
+            if (chip->key_state[i] == 1) {
+                chip->V[x] = i;
+                chip->PC += 2;
+                break;
+            }
+        }
+
         return CHIP8_ERROR_NONE;
     case 0x0015:
         chip->delay_timer = chip->V[x];
@@ -390,44 +345,43 @@ static int execF(Chip8* chip, uint16_t opcode) {
     }
 }
 
-static int exec(Chip8* chip) {
-    uint16_t opcode = fetch_opcode(chip);
-    SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "Opcode: %x", opcode);
+static int execute(Chip8* chip) {
+    uint16_t opcode = fetch(chip);
 
     switch (opcode & 0xF000)
     {
     case 0x0000:
-        return exec0(chip, opcode);
+        return execute0(chip, opcode);
     case 0x1000:
-        return exec1(chip, opcode);
+        return execute1(chip, opcode);
     case 0x2000:
-        return exec2(chip, opcode);
+        return execute2(chip, opcode);
     case 0x3000:
-        return exec3(chip, opcode);
+        return execute3(chip, opcode);
     case 0x4000:
-        return exec4(chip, opcode);
+        return execute4(chip, opcode);
     case 0x5000:
-        return exec5(chip, opcode);
+        return execute5(chip, opcode);
     case 0x6000:
-        return exec6(chip, opcode);
+        return execute6(chip, opcode);
     case 0x7000:
-        return exec7(chip, opcode);
+        return execute7(chip, opcode);
     case 0x8000:
-        return exec8(chip, opcode);
+        return execute8(chip, opcode);
     case 0x9000:
-        return exec9(chip, opcode);
+        return execute9(chip, opcode);
     case 0xA000:
-        return execA(chip, opcode);
+        return executeA(chip, opcode);
     case 0xB000:
-        return execB(chip, opcode);
+        return executeB(chip, opcode);
     case 0xC000:
-        return execC(chip, opcode);
+        return executeC(chip, opcode);
     case 0xD000:
-        return execD(chip, opcode);
+        return executeD(chip, opcode);
     case 0xE000:
-        return execE(chip, opcode);
+        return executeE(chip, opcode);
     case 0xF000:
-        return execF(chip, opcode);
+        return executeF(chip, opcode);
     default:
         return CHIP8_INVALID_INSTRUCTION;
     }
@@ -443,67 +397,19 @@ static void update_timers(Chip8* chip) {
     }
 }
 
-static void display(Chip8* chip) {
-    if (!chip->draw_flag) {
-        return;
-    }
-
-    SDL_RenderClear(chip->renderer);
-    SDL_UpdateTexture(chip->texture, NULL, chip->pixels, SCREEN_HEIGHT * sizeof(uint32_t));
-    SDL_RenderCopy(chip->renderer, chip->texture, NULL, NULL);
-    SDL_RenderPresent(chip->renderer);
-    chip->draw_flag = SDL_FALSE;
-}
-
-static void handle_window_event(Chip8* chip, SDL_WindowEvent* event) {
-    switch (event->event)
-    {
-    case SDL_WINDOWEVENT_RESIZED:
-        chip->draw_flag = SDL_TRUE;
-        break;
-    }
-}
-
-static void handle_events(Chip8* chip) {
-    SDL_Event event;
-
-    while (SDL_PollEvent(&event)) {
-        switch (event.type)
-        {
-        case SDL_QUIT:
-            chip->running = SDL_FALSE;
-            break;
-        case SDL_WINDOWEVENT:
-            handle_window_event(chip, &event.window);
-            break;
-        }
-    }
-}
-
-Chip8* chip8_create() {
+Chip8* chip8_create(uint8_t* key_state) {
     Chip8* chip = NULL;
+
+    if (key_state == NULL) {
+        SDL_InvalidParamError("key_state");
+        return NULL;
+    }
 
     if ((chip = SDL_malloc(sizeof(Chip8))) == NULL) {
         return NULL;
     }
 
-    if ((chip->window = SDL_CreateWindow("CHIP8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_RESIZABLE)) == NULL) {
-        SDL_free(chip);
-        return NULL;
-    }
-
-    if ((chip->renderer = SDL_CreateRenderer(chip->window, -1, SDL_RENDERER_ACCELERATED)) == NULL) {
-        SDL_DestroyWindow(chip->window);
-        SDL_free(chip);
-        return NULL;
-    }
-
-    if ((chip->texture = SDL_CreateTexture(chip->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 64, 32)) == NULL) {
-        SDL_DestroyRenderer(chip->renderer);
-        SDL_DestroyWindow(chip->window);
-        SDL_free(chip);
-        return NULL;
-    }
+    chip->key_state = key_state;
 
     return chip;
 }
@@ -513,52 +419,47 @@ void chip8_destroy(Chip8* chip) {
         return;
     }
 
-    SDL_DestroyTexture(chip->texture);
-    SDL_DestroyRenderer(chip->renderer);
-    SDL_DestroyWindow(chip->window);
     SDL_free(chip);
 }
 
-int chip8_load_rom(Chip8* chip, const char* path) {
-    SDL_RWops* f = NULL;
+void chip8_execute(Chip8* chip) {
+    execute(chip);
+    update_timers(chip);
+}
 
-    if ((f = SDL_RWFromFile(path, "r+b")) == NULL) {
-        return 0;
-    }
-
+void chip8_reset(Chip8* chip) {
     chip->I = 0;
     chip->PC = 0x200;
     chip->SP = 0;
     chip->delay_timer = 0;
     chip->sound_timer = 0;
     chip->draw_flag = SDL_TRUE;
-    chip->running = SDL_TRUE;
     SDL_memset(chip->pixels, 0, sizeof(chip->pixels));
     SDL_memcpy(chip->ram, fontset, sizeof(fontset) / sizeof(fontset[0]));
-    SDL_RWread(f, chip->ram + chip->PC, sizeof(uint8_t), sizeof(chip->ram) - 0x200);
+}
 
+int chip8_load_rom_file(Chip8* chip, const char* path) {
+    SDL_RWops* f = NULL;
+
+    if ((f = SDL_RWFromFile(path, "r+b")) == NULL) {
+        return 0;
+    }
+
+    chip8_reset(chip);
+    SDL_RWread(f, chip->ram + chip->PC, sizeof(uint8_t), sizeof(chip->ram) - 0x200);
     SDL_RWclose(f);
+
     return 1;
 }
 
-void chip8_run(Chip8* chip) {
-    const float frame_duration = 1000.0f / FPS;
-    Uint64 start, end;
-    float elapsed;
+SDL_bool chip8_draw_flag(Chip8* chip) {
+    return chip->draw_flag;
+}
 
-    while (chip->running) {
-        start = SDL_GetPerformanceCounter();
+void chip8_set_draw_flag(Chip8* chip, SDL_bool flag) {
+    chip->draw_flag = flag;
+}
 
-        exec(chip);
-        handle_events(chip);
-        display(chip);
-        update_timers(chip);
-
-        end = SDL_GetPerformanceCounter();
-        elapsed = (float)(end - start) / (float)SDL_GetPerformanceFrequency();
-
-        if (elapsed < frame_duration) {
-            SDL_Delay((Uint32) (frame_duration - elapsed));
-        }
-    }
+uint32_t* chip8_pixels(Chip8* chip) {
+    return chip->pixels;
 }
