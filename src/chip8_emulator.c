@@ -74,12 +74,19 @@ static void handle_events(Chip8Emulator* emulator) {
 }
 
 static void display(Chip8Emulator* emulator) {
+    uint32_t data[CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT];
+    const uint8_t* pixels = chip8_pixels(emulator->chip);
+
     if (!chip8_draw_flag(emulator->chip)) {
         return;
     }
 
+    for (size_t i = 0; i < CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT; i++) {
+        data[i] = (0xFFFFFF00 * pixels[i]) | 0x000000FF;
+    }
+
     SDL_RenderClear(emulator->renderer);
-    SDL_UpdateTexture(emulator->texture, NULL, chip8_pixels(emulator->chip), CHIP8_SCREEN_HEIGHT * sizeof(uint32_t));
+    SDL_UpdateTexture(emulator->texture, NULL, data, CHIP8_SCREEN_WIDTH * sizeof(uint32_t));
     SDL_RenderCopy(emulator->renderer, emulator->texture, NULL, NULL);
     SDL_RenderPresent(emulator->renderer);
     chip8_set_draw_flag(emulator->chip, SDL_FALSE);
@@ -110,7 +117,7 @@ Chip8Emulator* chip8_emulator_create() {
         return NULL;
     }
 
-    if ((emulator->texture = SDL_CreateTexture(emulator->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, CHIP8_SCREEN_HEIGHT, CHIP8_SCREEN_WIDTH)) == NULL) {
+    if ((emulator->texture = SDL_CreateTexture(emulator->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, CHIP8_SCREEN_WIDTH, CHIP8_SCREEN_HEIGHT)) == NULL) {
         chip8_destroy(emulator->chip);
         SDL_DestroyWindow(emulator->window);
         SDL_DestroyRenderer(emulator->renderer);

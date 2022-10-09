@@ -4,8 +4,8 @@
 
 #include <SDL_stdinc.h>
 
-#define CHIP8_SCREEN_WIDTH 32
-#define CHIP8_SCREEN_HEIGHT 64
+#define CHIP8_SCREEN_WIDTH 64
+#define CHIP8_SCREEN_HEIGHT 32
 #define CHIP8_KEY_COUNT 16
 
 #if defined(__cplusplus)
@@ -25,11 +25,11 @@ void chip8_reset(Chip8* chip);
 
 int chip8_load_rom_file(Chip8* chip, const char* path);
 
-SDL_bool chip8_draw_flag(Chip8* chip);
+SDL_bool chip8_draw_flag(const Chip8* chip);
 
 void chip8_set_draw_flag(Chip8* chip, SDL_bool flag);
 
-uint32_t* chip8_pixels(Chip8* chip);
+const uint8_t* chip8_pixels(Chip8* chip);
 
 #if defined(__cplusplus)
 }

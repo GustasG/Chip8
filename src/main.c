@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (chip8_load_rom_file(emulator->chip, "roms/MAZE") == 0) {
+    if (chip8_load_rom_file(emulator->chip, "roms/octojam2title.ch8") == 0) {
         fprintf(stderr, "%s\n", SDL_GetError());
         return 1;
     }

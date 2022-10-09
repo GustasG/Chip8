@@ -31,7 +31,7 @@ enum Chip8InstructionError {
 
 struct Chip8 {
     uint8_t ram[4096];
-    uint32_t pixels[CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT];
+    uint8_t pixels[CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT];
     uint16_t stack[32];
     uint8_t V[16];
     uint8_t* key_state;
@@ -247,14 +247,14 @@ static int executeD(Chip8* chip, uint16_t opcode) {
         uint8_t pixel = chip->ram[chip->I + i];
 
         for (uint8_t j = 0; j < 8; j++) {
-            uint16_t location = ((chip->V[y] + i) * CHIP8_SCREEN_HEIGHT) + chip->V[x] + j;
+            uint16_t location = ((chip->V[y] + i) * CHIP8_SCREEN_WIDTH) + chip->V[x] + j;
 
             if ((pixel & (0x80 >> j)) != 0) {
                 if (chip->pixels[location] != 0) {
                     chip->V[0xF] = 1;
                 }
 
-                chip->pixels[location] ^= 0xFFFFFFFF;
+                chip->pixels[location] ^= 1;
             }
         }
     }
@@ -452,7 +452,7 @@ int chip8_load_rom_file(Chip8* chip, const char* path) {
     return 1;
 }
 
-SDL_bool chip8_draw_flag(Chip8* chip) {
+SDL_bool chip8_draw_flag(const Chip8* chip) {
     return chip->draw_flag;
 }
 
@@ -460,6 +460,6 @@ void chip8_set_draw_flag(Chip8* chip, SDL_bool flag) {
     chip->draw_flag = flag;
 }
 
-uint32_t* chip8_pixels(Chip8* chip) {
+const uint8_t* chip8_pixels(Chip8* chip) {
     return chip->pixels;
 }
