@@ -1,5 +1,7 @@
 # Chip8
 
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/91d006ad79cf4d86b532ec6ec24f1658)](https://www.codacy.com/gh/GustasG/Chip8/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=GustasG/Chip8&amp;utm_campaign=Badge_Grade)
+
 CHIP-8 emulator
 
 ## Installation

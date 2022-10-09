@@ -12,6 +12,11 @@
 extern "C" {
 #endif
 
+enum Chip8InstructionError {
+    CHIP8_ERROR_NONE,
+    CHIP8_INVALID_INSTRUCTION
+};
+
 struct Chip8;
 typedef struct Chip8 Chip8;
 
@@ -19,7 +24,7 @@ Chip8* chip8_create(uint8_t* key_state);
 
 void chip8_destroy(Chip8* chip);
 
-void chip8_execute(Chip8* chip);
+int chip8_execute(Chip8* chip);
 
 void chip8_reset(Chip8* chip);
 

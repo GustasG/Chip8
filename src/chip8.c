@@ -24,11 +24,6 @@ static const uint8_t fontset[] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80
 };
 
-enum Chip8InstructionError {
-    CHIP8_ERROR_NONE = 0,
-    CHIP8_INVALID_INSTRUCTION
-};
-
 struct Chip8 {
     uint8_t ram[4096];
     uint8_t pixels[CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT];
@@ -422,9 +417,14 @@ void chip8_destroy(Chip8* chip) {
     SDL_free(chip);
 }
 
-void chip8_execute(Chip8* chip) {
-    execute(chip);
-    update_timers(chip);
+int chip8_execute(Chip8* chip) {
+    int result = execute(chip);
+
+    if (result == 0) {
+        update_timers(chip);
+    }
+
+    return result;
 }
 
 void chip8_reset(Chip8* chip) {

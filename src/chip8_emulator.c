@@ -144,18 +144,16 @@ void chip8_emulator_destroy(Chip8Emulator* emulator) {
 
 void chip8_emulator_run(Chip8Emulator* emulator) {
     const float frame_duration = 1000.0f / FPS;
-    Uint64 start, end;
-    float elapsed;
 
     while (emulator->running) {
-        start = SDL_GetPerformanceCounter();
+        Uint64 start = SDL_GetPerformanceCounter();
 
         chip8_execute(emulator->chip);
         handle_events(emulator);
         display(emulator);
 
-        end = SDL_GetPerformanceCounter();
-        elapsed = (float)(end - start) / (float)SDL_GetPerformanceFrequency();
+        Uint64 end = SDL_GetPerformanceCounter();
+        float elapsed = (float)(end - start) / (float)SDL_GetPerformanceFrequency();
 
         if (elapsed < frame_duration) {
             SDL_Delay((Uint32) (frame_duration - elapsed));
