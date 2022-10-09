@@ -1,6 +1,6 @@
 # Chip8
 
-Chip8 emulator
+CHIP-8 emulator
 
 ## Installation
 
