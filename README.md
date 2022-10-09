@@ -13,4 +13,4 @@ cmake ..
 cmake --build .
 ```
 
-After this both emulator binary and project files should be in /build folder.
+After this both emulator binary and project files should be in /build directory.
