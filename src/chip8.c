@@ -5,6 +5,20 @@
 #include <SDL_error.h>
 #include <SDL_rwops.h>
 
+struct Chip8 {
+    uint8_t ram[4096];
+    uint8_t pixels[CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT];
+    uint16_t stack[32];
+    uint8_t V[16];
+    uint8_t* key_state;
+    uint16_t I;
+    uint16_t PC;
+    uint16_t SP;
+    uint8_t delay_timer;
+    uint8_t sound_timer;
+    bool draw_flag;
+};
+
 static const uint8_t fontset[] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0,
     0x20, 0x60, 0x20, 0x20, 0x70,
@@ -22,20 +36,6 @@ static const uint8_t fontset[] = {
     0xE0, 0x90, 0x90, 0x90, 0xE0,
     0xF0, 0x80, 0xF0, 0x80, 0xF0,
     0xF0, 0x80, 0xF0, 0x80, 0x80
-};
-
-struct Chip8 {
-    uint8_t ram[4096];
-    uint8_t pixels[CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT];
-    uint16_t stack[32];
-    uint8_t V[16];
-    uint8_t* key_state;
-    uint16_t I;
-    uint16_t PC;
-    uint16_t SP;
-    uint8_t delay_timer;
-    uint8_t sound_timer;
-    SDL_bool draw_flag;
 };
 
 static uint16_t fetch(const Chip8* chip) {
@@ -58,7 +58,7 @@ static int execute0(Chip8* chip, uint16_t opcode) {
     {
     case 0x00E0:
         SDL_memset(chip->pixels, 0, sizeof(chip->pixels));
-        chip8_set_draw_flag(chip, SDL_TRUE);
+        chip8_set_draw_flag(chip, true);
         chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x00EE:
@@ -245,7 +245,7 @@ static int executeD(Chip8* chip, uint16_t opcode) {
             uint16_t location = ((chip->V[y] + i) * CHIP8_SCREEN_WIDTH) + chip->V[x] + j;
 
             if ((pixel & (0x80 >> j)) != 0) {
-                if (chip->pixels[location] != 0) {
+                if (chip->pixels[location] == 1) {
                     chip->V[0xF] = 1;
                 }
 
@@ -255,7 +255,7 @@ static int executeD(Chip8* chip, uint16_t opcode) {
     }
 
     chip->PC += 2;
-    chip8_set_draw_flag(chip, SDL_TRUE);
+    chip8_set_draw_flag(chip, true);
 
     return CHIP8_ERROR_NONE;
 }
@@ -428,12 +428,16 @@ int chip8_execute(Chip8* chip) {
 }
 
 void chip8_reset(Chip8* chip) {
+    if (chip == NULL) {
+        return;
+    }
+
     chip->I = 0;
     chip->PC = 0x200;
     chip->SP = 0;
     chip->delay_timer = 0;
     chip->sound_timer = 0;
-    chip->draw_flag = SDL_TRUE;
+    chip->draw_flag = true;
     SDL_memset(chip->pixels, 0, sizeof(chip->pixels));
     SDL_memcpy(chip->ram, fontset, sizeof(fontset) / sizeof(fontset[0]));
 }
@@ -441,25 +445,29 @@ void chip8_reset(Chip8* chip) {
 int chip8_load_rom_file(Chip8* chip, const char* path) {
     SDL_RWops* f = NULL;
 
+    if (chip == NULL) {
+        return SDL_InvalidParamError("chip");
+    }
+
     if ((f = SDL_RWFromFile(path, "r+b")) == NULL) {
-        return 0;
+        return -1;
     }
 
     chip8_reset(chip);
     SDL_RWread(f, chip->ram + chip->PC, sizeof(uint8_t), sizeof(chip->ram) - 0x200);
     SDL_RWclose(f);
 
-    return 1;
+    return 0;
 }
 
-SDL_bool chip8_draw_flag(const Chip8* chip) {
+bool chip8_draw_flag(const Chip8* chip) {
     return chip->draw_flag;
 }
 
-void chip8_set_draw_flag(Chip8* chip, SDL_bool flag) {
+void chip8_set_draw_flag(Chip8* chip, bool flag) {
     chip->draw_flag = flag;
 }
 
-const uint8_t* chip8_pixels(Chip8* chip) {
+const uint8_t* chip8_pixels(const Chip8* chip) {
     return chip->pixels;
 }

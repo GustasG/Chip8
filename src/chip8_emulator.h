@@ -1,25 +1,19 @@
 #pragma once
 
-#include <SDL_render.h>
-
 #include "chip8.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-typedef struct Chip8Emulator {
-    Chip8* chip;
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-    SDL_Texture* texture;
-    uint8_t key_state[CHIP8_KEY_COUNT];
-    SDL_bool running;
-} Chip8Emulator;
+struct Chip8Emulator;
+typedef struct Chip8Emulator Chip8Emulator;
 
 Chip8Emulator* chip8_emulator_create();
 
 void chip8_emulator_destroy(Chip8Emulator* emulator);
+
+int chip8_emulator_load_rom_file(Chip8Emulator* emulator, const char* path);
 
 void chip8_emulator_run(Chip8Emulator* emulator);
 

@@ -6,24 +6,26 @@
 
 #include "chip8_emulator.h"
 
+static void fail() {
+    fprintf(stderr, "%s\n", SDL_GetError());
+    exit(1);
+}
+
 int main(int argc, char** argv) {
     Chip8Emulator* emulator = NULL;
 
-    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
-        fprintf(stderr, "SDL init failed\n");
-        return 1;
-    }
-
     srand(time(NULL));
 
-    if ((emulator = chip8_emulator_create()) == NULL) {
-        fprintf(stderr, "Failed to create chip\n");
-        return 1;
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+        fail();
     }
 
-    if (chip8_load_rom_file(emulator->chip, "roms/octojam2title.ch8") == 0) {
-        fprintf(stderr, "%s\n", SDL_GetError());
-        return 1;
+    if ((emulator = chip8_emulator_create()) == NULL) {
+        fail();
+    }
+
+    if (chip8_emulator_load_rom_file(emulator, "roms/test_opcode.ch8") != 0) {
+        fail();
     }
 
     chip8_emulator_run(emulator);

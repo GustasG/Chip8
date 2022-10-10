@@ -1,9 +1,19 @@
 #include "chip8_emulator.h"
 
 #include <SDL_events.h>
+#include <SDL_render.h>
 #include <SDL_timer.h>
 
 #define FPS 540.0f
+
+struct Chip8Emulator {
+    Chip8* chip;
+    SDL_Window* window;
+    SDL_Renderer* renderer;
+    SDL_Texture* texture;
+    uint8_t key_state[CHIP8_KEY_COUNT];
+    bool running;
+};
 
 static const int key_map[] = {
     SDL_SCANCODE_1, // 0
@@ -28,7 +38,7 @@ static void handle_window_event(Chip8Emulator* emulator, SDL_WindowEvent* event)
     switch (event->event)
     {
     case SDL_WINDOWEVENT_RESIZED:
-        chip8_set_draw_flag(emulator->chip, SDL_TRUE);
+        chip8_set_draw_flag(emulator->chip, true);
         break;
     }
 }
@@ -58,7 +68,7 @@ static void handle_events(Chip8Emulator* emulator) {
         switch (event.type)
         {
         case SDL_QUIT:
-            emulator->running = SDL_FALSE;
+            emulator->running = false;
             break;
         case SDL_WINDOWEVENT:
             handle_window_event(emulator, &event.window);
@@ -89,7 +99,7 @@ static void display(Chip8Emulator* emulator) {
     SDL_UpdateTexture(emulator->texture, NULL, data, CHIP8_SCREEN_WIDTH * sizeof(uint32_t));
     SDL_RenderCopy(emulator->renderer, emulator->texture, NULL, NULL);
     SDL_RenderPresent(emulator->renderer);
-    chip8_set_draw_flag(emulator->chip, SDL_FALSE);
+    chip8_set_draw_flag(emulator->chip, false);
 }
 
 Chip8Emulator* chip8_emulator_create() {
@@ -126,7 +136,7 @@ Chip8Emulator* chip8_emulator_create() {
     }
 
     SDL_memset(emulator->key_state, 0, sizeof(emulator->key_state));
-    emulator->running = SDL_TRUE;
+    emulator->running = true;
 
     return emulator;
 }
@@ -140,6 +150,14 @@ void chip8_emulator_destroy(Chip8Emulator* emulator) {
     SDL_DestroyTexture(emulator->texture);
     SDL_DestroyRenderer(emulator->renderer);
     SDL_DestroyWindow(emulator->window);
+}
+
+int chip8_emulator_load_rom_file(Chip8Emulator* emulator, const char* path) {
+    if (emulator == NULL) {
+        return SDL_InvalidParamError("emulator");
+    }
+
+    return chip8_load_rom_file(emulator->chip, path);
 }
 
 void chip8_emulator_run(Chip8Emulator* emulator) {
