@@ -162,11 +162,21 @@ int chip8_emulator_load_rom_file(Chip8Emulator* emulator, const char* path) {
 
 void chip8_emulator_run(Chip8Emulator* emulator) {
     const float frame_duration = 1000.0f / FPS;
+    const int timer_update_fps = (int)(FPS / 60.0);
+    int frames = 0;
 
     while (emulator->running) {
         Uint64 start = SDL_GetPerformanceCounter();
 
         chip8_execute(emulator->chip);
+
+        if (frames == timer_update_fps) {
+            chip8_update_timers(emulator->chip);
+            frames = 0;
+        }
+
+        frames += 1;
+
         handle_events(emulator);
         display(emulator);
 

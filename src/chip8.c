@@ -59,10 +59,9 @@ static int execute0(Chip8* chip, uint16_t opcode) {
     case 0x00E0:
         SDL_memset(chip->pixels, 0, sizeof(chip->pixels));
         chip8_set_draw_flag(chip, true);
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x00EE:
-        chip->PC = pop(chip) + 2;
+        chip->PC = pop(chip);
         return CHIP8_ERROR_NONE;
     default:
         return CHIP8_INVALID_INSTRUCTION;
@@ -70,25 +69,25 @@ static int execute0(Chip8* chip, uint16_t opcode) {
 }
 
 static int execute1(Chip8* chip, uint16_t opcode) {
-    chip->PC = opcode & 0x0FFF;
+    uint16_t value = opcode & 0x0FFF;
+    chip->PC = value;
 
     return CHIP8_ERROR_NONE;
 }
 
 static int execute2(Chip8* chip, uint16_t opcode) {
+    uint16_t value = opcode & 0x0FFF;
     push(chip, chip->PC);
-    chip->PC = opcode & 0x0FFF;
+    chip->PC = value;
 
     return CHIP8_ERROR_NONE;
 }
 
 static int execute3(Chip8* chip, uint16_t opcode) {
-    uint8_t reg = (opcode & 0x0F00) >> 8;
+    uint8_t x = (opcode & 0x0F00) >> 8;
     uint16_t value = opcode & 0x00FF;
 
-    if (chip->V[reg] == value) {
-        chip->PC += 4;
-    } else {
+    if (chip->V[x] == value) {
         chip->PC += 2;
     }
 
@@ -96,12 +95,10 @@ static int execute3(Chip8* chip, uint16_t opcode) {
 }
 
 static int execute4(Chip8* chip, uint16_t opcode) {
-    uint8_t reg = (opcode & 0x0F00) >> 8;
+    uint8_t x = (opcode & 0x0F00) >> 8;
     uint16_t value = opcode & 0x00FF;
 
-    if (chip->V[reg] != value) {
-        chip->PC += 4;
-    } else {
+    if (chip->V[x] != value) {
         chip->PC += 2;
     }
 
@@ -113,8 +110,6 @@ static int execute5(Chip8* chip, uint16_t opcode) {
     uint8_t y = (opcode & 0x00F0) >> 4;
 
     if (chip->V[x] == chip->V[y]) {
-        chip->PC += 4;
-    } else {
         chip->PC += 2;
     }
 
@@ -122,21 +117,17 @@ static int execute5(Chip8* chip, uint16_t opcode) {
 }
 
 static int execute6(Chip8* chip, uint16_t opcode) {
-    uint8_t reg = (opcode & 0x0F00) >> 8;
+    uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t value = opcode & 0x00FF;
-
-    chip->V[reg] = value;
-    chip->PC += 2;
+    chip->V[x] = value;
 
     return CHIP8_ERROR_NONE;
 }
 
 static int execute7(Chip8* chip, uint16_t opcode) {
-    uint8_t reg = (opcode & 0x0F00) >> 8;
+    uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t value = opcode & 0x00FF;
-
-    chip->V[reg] += value;
-    chip->PC += 2;
+    chip->V[x] += value;
 
     return CHIP8_ERROR_NONE;
 }
@@ -149,44 +140,35 @@ static int execute8(Chip8* chip, uint16_t opcode) {
     {
     case 0x0000:
         chip->V[x] = chip->V[y];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0001:
         chip->V[x] |= chip->V[y];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0002:
         chip->V[x] &= chip->V[y];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0003:
         chip->V[x] ^= chip->V[y];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0004:
         chip->V[0xF] = (chip->V[x] > 0xFF - chip->V[y] ? 0 : 1);
         chip->V[x] += chip->V[y];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0005:
         chip->V[0xF] = (chip->V[y] > chip->V[x] ? 0 : 1);
         chip->V[x] -= chip->V[y];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0006:
         chip->V[0xF] = chip->V[x] & 0x1;
         chip->V[x] >>= 1;
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0007:
         chip->V[0xF] = (chip->V[x] > chip->V[y] ? 0 : 1);
         chip->V[x] = chip->V[y] - chip->V[x];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x000E:
         chip->V[0xF] = chip->V[x] >> 7;
         chip->V[x] <<= 1;
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     default:
         return CHIP8_INVALID_INSTRUCTION;
@@ -198,8 +180,6 @@ static int execute9(Chip8* chip, uint16_t opcode) {
     uint8_t y = (opcode & 0x00F0) >> 4;
 
     if (chip->V[x] != chip->V[y]) {
-        chip->PC += 4;
-    } else {
         chip->PC += 2;
     }
 
@@ -207,15 +187,15 @@ static int execute9(Chip8* chip, uint16_t opcode) {
 }
 
 static int executeA(Chip8* chip, uint16_t opcode) {
-    chip->I = opcode & 0x0FFF;
-    chip->PC += 2;
+    uint16_t value = opcode & 0x0FFF;
+    chip->I = value;
 
     return CHIP8_ERROR_NONE;
 }
 
 static int executeB(Chip8* chip, uint16_t opcode) {
-    chip->PC = chip->V[0] + opcode & 0x0FFF;
-    chip->PC += 2;
+    uint16_t value = opcode & 0x0FFF;
+    chip->PC = chip->V[0] + value;
 
     return CHIP8_ERROR_NONE;
 }
@@ -224,9 +204,7 @@ static int executeC(Chip8* chip, uint16_t opcode) {
     uint8_t reg = (opcode & 0x0F00) >> 8;
     uint8_t random = rand() % 256;
     uint8_t value = opcode & 0x00FF;
-
     chip->V[reg] = random & value;
-    chip->PC += 2;
 
     return CHIP8_ERROR_NONE;
 }
@@ -254,7 +232,6 @@ static int executeD(Chip8* chip, uint16_t opcode) {
         }
     }
 
-    chip->PC += 2;
     chip8_set_draw_flag(chip, true);
 
     return CHIP8_ERROR_NONE;
@@ -267,16 +244,12 @@ static int executeE(Chip8* chip, uint16_t opcode) {
     {
     case 0x009E:
         if (chip->key_state[chip->V[x]] == 1) {
-            chip->PC += 4;
-        } else {
             chip->PC += 2;
         }
 
         return CHIP8_ERROR_NONE;
     case 0x00A1:
         if (chip->key_state[chip->V[x]] == 0) {
-            chip->PC += 4;
-        } else {
             chip->PC += 2;
         }
 
@@ -293,47 +266,45 @@ static int executeF(Chip8* chip, uint16_t opcode) {
     {
     case 0x0007:
         chip->V[x] = chip->delay_timer;
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x000A:
+        bool pressed = false;
+
         for (uint8_t i = 0; i < CHIP8_KEY_COUNT; i++) {
             if (chip->key_state[i] == 1) {
                 chip->V[x] = i;
-                chip->PC += 2;
+                pressed = true;
                 break;
             }
+        }
+
+        if (!pressed) {
+            chip->PC -= 2;
         }
 
         return CHIP8_ERROR_NONE;
     case 0x0015:
         chip->delay_timer = chip->V[x];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0018:
         chip->sound_timer = chip->V[x];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x001E:
         chip->I += chip->V[x];
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0029:
         chip->I = chip->V[x] * 0x05;
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0033:
         chip->ram[chip->I] = chip->V[x] / 100;
         chip->ram[chip->I + 1] = (chip->V[x] / 10) % 10;
         chip->ram[chip->I + 2] = (chip->V[x] % 100) % 10;
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0055:
         SDL_memcpy(&chip->ram[chip->I], chip->V, x + 1);
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     case 0x0065:
         SDL_memcpy(chip->V, &chip->ram[chip->I], x + 1);
-        chip->PC += 2;
         return CHIP8_ERROR_NONE;
     default:
         return CHIP8_INVALID_INSTRUCTION;
@@ -342,6 +313,7 @@ static int executeF(Chip8* chip, uint16_t opcode) {
 
 static int execute(Chip8* chip) {
     uint16_t opcode = fetch(chip);
+    chip->PC += 2;
 
     switch (opcode & 0xF000)
     {
@@ -382,16 +354,6 @@ static int execute(Chip8* chip) {
     }
 }
 
-static void update_timers(Chip8* chip) {
-    if (chip->delay_timer > 0) {
-        chip->delay_timer -= 1;
-    }
-
-    if (chip->sound_timer > 0) {
-        chip->sound_timer -= 1;
-    }
-}
-
 Chip8* chip8_create(uint8_t* key_state) {
     Chip8* chip = NULL;
 
@@ -418,13 +380,17 @@ void chip8_destroy(Chip8* chip) {
 }
 
 int chip8_execute(Chip8* chip) {
-    int result = execute(chip);
+    return execute(chip);
+}
 
-    if (result == 0) {
-        update_timers(chip);
+void chip8_update_timers(Chip8* chip) {
+    if (chip->delay_timer > 0) {
+        chip->delay_timer -= 1;
     }
 
-    return result;
+    if (chip->sound_timer > 0) {
+        chip->sound_timer -= 1;
+    }
 }
 
 void chip8_reset(Chip8* chip) {

@@ -25,6 +25,8 @@ void chip8_destroy(Chip8* chip);
 
 int chip8_execute(Chip8* chip);
 
+void chip8_update_timers(Chip8* chip);
+
 void chip8_reset(Chip8* chip);
 
 int chip8_load_rom_file(Chip8* chip, const char* path);
