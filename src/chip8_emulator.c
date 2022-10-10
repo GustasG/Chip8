@@ -4,34 +4,33 @@
 #include <SDL_render.h>
 #include <SDL_timer.h>
 
-#define FPS 540.0f
-
 struct Chip8Emulator {
     Chip8* chip;
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
     uint8_t key_state[CHIP8_KEY_COUNT];
+    float fps;
     bool running;
 };
 
 static const int key_map[] = {
-    SDL_SCANCODE_1, // 0
-    SDL_SCANCODE_2, // 1
-    SDL_SCANCODE_3, // 2
-    SDL_SCANCODE_4, // 3
-    SDL_SCANCODE_Q, // 4
-    SDL_SCANCODE_W, // 5
-    SDL_SCANCODE_E, // 6
-    SDL_SCANCODE_R, // 7
-    SDL_SCANCODE_A, // 8
-    SDL_SCANCODE_S, // 9
-    SDL_SCANCODE_D, // A
-    SDL_SCANCODE_F, // B
-    SDL_SCANCODE_Z, // C
-    SDL_SCANCODE_X, // D
-    SDL_SCANCODE_C, // E
-    SDL_SCANCODE_V  // F
+    SDL_SCANCODE_X,
+    SDL_SCANCODE_1,
+    SDL_SCANCODE_2,
+    SDL_SCANCODE_3,
+    SDL_SCANCODE_Q,
+    SDL_SCANCODE_W,
+    SDL_SCANCODE_E,
+    SDL_SCANCODE_A,
+    SDL_SCANCODE_S,
+    SDL_SCANCODE_D,
+    SDL_SCANCODE_Z,
+    SDL_SCANCODE_C,
+    SDL_SCANCODE_4,
+    SDL_SCANCODE_R,
+    SDL_SCANCODE_F,
+    SDL_SCANCODE_V
 };
 
 static void handle_window_event(Chip8Emulator* emulator, SDL_WindowEvent* event) {
@@ -136,6 +135,7 @@ Chip8Emulator* chip8_emulator_create() {
     }
 
     SDL_memset(emulator->key_state, 0, sizeof(emulator->key_state));
+    emulator->fps = 60.0f;
     emulator->running = true;
 
     return emulator;
@@ -161,8 +161,8 @@ int chip8_emulator_load_rom_file(Chip8Emulator* emulator, const char* path) {
 }
 
 void chip8_emulator_run(Chip8Emulator* emulator) {
-    const float frame_duration = 1000.0f / FPS;
-    const int timer_update_fps = (int)(FPS / 60.0);
+    const float frame_duration = 1000.0f / chip8_emulator_fps(emulator);
+    const int timer_update_fps = (int)(chip8_emulator_fps(emulator) / 60.0);
     int frames = 0;
 
     while (emulator->running) {
@@ -187,4 +187,17 @@ void chip8_emulator_run(Chip8Emulator* emulator) {
             SDL_Delay((Uint32) (frame_duration - elapsed));
         }
     }
+}
+
+float chip8_emulator_fps(const Chip8Emulator* emulator) {
+    return emulator->fps;
+}
+
+void chip8_emulator_set_fps(Chip8Emulator* emulator, float fps) {
+    if (fps <= 0.0) {
+        SDL_SetError("Non positive FPS is invalid");
+        return;
+    }
+
+    emulator->fps = fps;
 }
