@@ -405,7 +405,7 @@ void chip8_reset(Chip8* chip) {
     chip->sound_timer = 0;
     chip->draw_flag = true;
     SDL_memset(chip->pixels, 0, sizeof(chip->pixels));
-    SDL_memcpy(chip->ram, fontset, sizeof(fontset) / sizeof(fontset[0]));
+    SDL_memcpy(chip->ram, fontset, sizeof(fontset));
 }
 
 int chip8_load_rom_file(Chip8* chip, const char* path) {
